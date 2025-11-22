@@ -1,0 +1,58 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+
+venv/
+
+# Model artifacts (large files)
+*.pth
+*.onnx
+*.mar
+*.pt
+*.h5
+*.pkl
+
+# Data
+data/
+datasets/
+*.jpg
+*.png
+*.jpeg
+*.csv
+*.zip
+*.tar.gz
+
+# Training outputs
+logs/
+runs/
+checkpoints/
+wandb/
+
+# Jupyter
+.ipynb_checkpoints
+*.ipynb
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+*.log
+
+# Keep metadata and configs (small JSON files are fine)
+!*_metadata.json
+!training_history.json
+
+# Docker
+*.tar
