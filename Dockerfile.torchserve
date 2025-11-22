@@ -1,0 +1,26 @@
+FROM --platform=linux/amd64 pytorch/torchserve:0.9.0-cpu
+
+COPY models/model_artifacts/resnet18_neu.pth /home/model-server/model-store/
+COPY torchserve/handler.py /home/model-server/
+COPY torchserve/config.properties /home/model-server/config/
+
+USER root
+RUN torch-model-archiver \
+    --model-name defect_classifier \
+    --version 1.0 \
+    --serialized-file /home/model-server/model-store/resnet18_neu.pth \
+    --handler /home/model-server/handler.py \
+    --export-path /home/model-server/model-store/ \
+    --force
+
+RUN rm /home/model-server/handler.py
+
+USER model-server
+
+EXPOSE 8080 8081 8082
+
+CMD ["torchserve", \
+     "--start", \
+     "--model-store", "/home/model-server/model-store", \
+     "--models", "defect_classifier=defect_classifier.mar", \
+     "--ts-config", "/home/model-server/config/config.properties"]

@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: torchserve-defect-classifier
+  labels:
+    app: torchserve-defect-classifier
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: torchserve-defect-classifier
+  template:
+    metadata:
+      labels:
+        app: torchserve-defect-classifier
+    spec:
+      containers:
+      - name: torchserve
+        image: torchserve-defect-classifier:latest
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 8080
+          name: inference
+        - containerPort: 8081
+          name: management
+        - containerPort: 8082
+          name: metrics
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /ping
+            port: 8080
+          initialDelaySeconds: 60
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ping
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 5

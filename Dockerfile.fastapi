@@ -1,0 +1,14 @@
+FROM --platform=linux/amd64 python:3.11-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY fastapi_app/ ./fastapi_app/
+COPY models/model_artifacts/resnet18_neu.onnx ./models/model_artifacts/resnet18_neu.onnx
+COPY models/model_artifacts/resnet18_neu_metadata.json ./models/model_artifacts/resnet18_neu_metadata.json
+
+EXPOSE 8000
+
+CMD ["python", "-m", "uvicorn", "fastapi_app.main:app", "--host", "0.0.0.0", "--port", "8000"]
