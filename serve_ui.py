@@ -1,8 +1,5 @@
 #!/usr/bin/env python3
-"""Simple HTTP server for test UI"""
-
 from http.server import HTTPServer, SimpleHTTPRequestHandler
-import sys
 
 class CORSRequestHandler(SimpleHTTPRequestHandler):
     def end_headers(self):
@@ -13,8 +10,6 @@ class CORSRequestHandler(SimpleHTTPRequestHandler):
 
 if __name__ == '__main__':
     port = 3000
-    print(f"🚀 Starting test UI server on http://localhost:{port}")
-    print(f"📂 Open http://localhost:{port}/test_ui.html")
-
-    server = HTTPServer(('localhost', port), CORSRequestHandler)
+    print(f"🚀 Starting test UI server on http://0.0.0.0:{port}")
+    server = HTTPServer(('0.0.0.0', port), CORSRequestHandler)  # Changed from 'localhost'
     server.serve_forever()
