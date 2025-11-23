@@ -23,7 +23,7 @@ jobs:
         run: |
           sudo rm -rf /usr/share/dotnet
           sudo rm -rf /opt/ghc
-          sudo rm -rf "/usr/local/share/boost"
+          sudo rm -rf /usr/local/share/boost
           df -h
 
       - name: Set up Python
@@ -157,40 +157,62 @@ jobs:
 
           if [ "${{ matrix.service }}" = "fastapi" ]; then
             docker run -d -p 8000:8000 --name test-fastapi "$IMAGE_TAG"
-            echo "Waiting for FastAPI..."
-            sleep 20
-            for i in {1..10}; do
-              if curl -f http://localhost:8000/health; then
-                echo "✓ FastAPI healthy"
-                break
-              fi
+            echo "Waiting for FastAPI to start..."
+
+            for i in {1..30}; do
               sleep 2
+              if curl -sf http://localhost:8000/health > /dev/null 2>&1; then
+                echo "✓ FastAPI is healthy"
+                curl http://localhost:8000/health
+                docker stop test-fastapi && docker rm test-fastapi
+                exit 0
+              fi
+              echo "Attempt $i/30..."
             done
+
+            echo "Failed to connect to FastAPI"
+            docker logs test-fastapi
             docker stop test-fastapi && docker rm test-fastapi
+            exit 1
+
           elif [ "${{ matrix.service }}" = "torchserve" ]; then
             docker run -d -p 8080:8080 --name test-torchserve "$IMAGE_TAG"
-            echo "Waiting for TorchServe..."
-            sleep 30
-            for i in {1..10}; do
-              if curl -f http://localhost:8080/ping; then
-                echo "✓ TorchServe healthy"
-                break
+            echo "Waiting for TorchServe to start..."
+
+            for i in {1..30}; do
+              sleep 2
+              if curl -sf http://localhost:8080/ping > /dev/null 2>&1; then
+                echo "✓ TorchServe is healthy"
+                curl http://localhost:8080/ping
+                docker stop test-torchserve && docker rm test-torchserve
+                exit 0
               fi
-              sleep 3
+              echo "Attempt $i/30..."
             done
+
+            echo "Failed to connect to TorchServe"
+            docker logs test-torchserve
             docker stop test-torchserve && docker rm test-torchserve
+            exit 1
+
           else
             docker run -d -p 3000:3000 --name test-frontend "$IMAGE_TAG"
-            echo "Waiting for Frontend..."
-            sleep 5
-            for i in {1..5}; do
-              if curl -f http://localhost:3000/test_ui.html; then
-                echo "✓ Frontend healthy"
-                break
-              fi
+            echo "Waiting for Frontend to start..."
+
+            for i in {1..20}; do
               sleep 2
+              if curl -sf http://localhost:3000/test_ui.html > /dev/null 2>&1; then
+                echo "✓ Frontend is healthy"
+                docker stop test-frontend && docker rm test-frontend
+                exit 0
+              fi
+              echo "Attempt $i/20..."
             done
+
+            echo "Failed to connect to Frontend"
+            docker logs test-frontend
             docker stop test-frontend && docker rm test-frontend
+            exit 1
           fi
 
   integration-test:
@@ -206,10 +228,29 @@ jobs:
           name: validated-models
           path: models/model_artifacts/
 
-      - name: Start services
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull images from registry
         run: |
-          docker compose up -d
-          sleep 30
+          IMAGE_PREFIX="ghcr.io/${{ github.repository }}"
+          docker pull "${IMAGE_PREFIX}-fastapi:latest"
+          docker pull "${IMAGE_PREFIX}-torchserve:latest"
+
+      - name: Start services with GHCR images
+        run: |
+          # Use images from registry
+          IMAGE_PREFIX="ghcr.io/${{ github.repository }}"
+
+          docker run -d -p 8000:8000 --name fastapi "${IMAGE_PREFIX}-fastapi:latest"
+          docker run -d -p 8080:8080 -p 8081:8081 -p 8082:8082 --name torchserve "${IMAGE_PREFIX}-torchserve:latest"
+
+          echo "Waiting for services..."
+          sleep 45
 
       - name: Run integration tests
         run: |
@@ -222,7 +263,9 @@ jobs:
 
       - name: Cleanup
         if: always()
-        run: docker compose down
+        run: |
+          docker stop fastapi torchserve || true
+          docker rm fastapi torchserve || true
 
   deploy-to-fly:
     needs: integration-test
