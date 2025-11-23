@@ -24,15 +24,47 @@ jobs:
           python-version: '3.11'
           cache: 'pip'
 
+      - name: Cache pip packages
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
       - name: Install dependencies
         run: |
           pip install torch torchvision onnx onnxruntime numpy pillow huggingface-hub
 
+      - name: Check if model exists locally
+        id: check_model
+        run: |
+          if [ -f "models/model_artifacts/resnet18_neu.onnx" ]; then
+            echo "model_exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "model_exists=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Download model from HuggingFace
+        if: steps.check_model.outputs.model_exists == 'false' && env.HF_MODEL_REPO != ''
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_MODEL_REPO: ${{ secrets.HF_MODEL_REPO }}
         run: |
-          python models/push_to_registry.py pull --repo-id ${{ secrets.HF_MODEL_REPO }}
+          python models/push_to_registry.py pull --repo-id "$HF_MODEL_REPO"
+
+      - name: Skip if no model available
+        if: steps.check_model.outputs.model_exists == 'false' && env.HF_MODEL_REPO == ''
+        env:
+          HF_MODEL_REPO: ${{ secrets.HF_MODEL_REPO }}
+        run: |
+          echo "⚠️  No model found locally or in registry"
+          echo "First time setup:"
+          echo "  1. Train model: python models/train_defect_classifier.py"
+          echo "  2. Export: python models/export_to_onnx.py"
+          echo "  3. Push: python models/push_to_registry.py push"
+          echo "  4. Set HF_MODEL_REPO secret"
+          exit 1
 
       - name: Validate ONNX model
         run: |
@@ -92,6 +124,12 @@ jobs:
             type=sha,prefix={{branch}}-
             type=raw,value=latest,enable={{is_default_branch}}
 
+      - name: Convert image name to lowercase
+        id: image_name
+        run: |
+          IMAGE_NAME="${{ steps.meta.outputs.tags }}"
+          echo "lowercase=${IMAGE_NAME,,}" >> $GITHUB_OUTPUT
+
       - name: Build and push
         uses: docker/build-push-action@v5
         with:
@@ -103,14 +141,23 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Get image name for testing
+        id: test_image
+        run: |
+          IMAGE="${{ env.REGISTRY }}/${{ github.repository }}-${{ matrix.service }}"
+          echo "name=${IMAGE,,}:latest" >> $GITHUB_OUTPUT
+
       - name: Test container
         run: |
+          IMAGE="${{ env.REGISTRY }}/${{ github.repository }}-${{ matrix.service }}"
+          IMAGE="${IMAGE,,}:latest"
+
           if [ "${{ matrix.service }}" = "fastapi" ]; then
-            docker run -d -p 8000:8000 --name test-fastapi ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_FASTAPI }}:latest
+            docker run -d -p 8000:8000 --name test-fastapi "$IMAGE"
             sleep 10
             curl -f http://localhost:8000/health || exit 1
           else
-            docker run -d -p 8080:8080 --name test-torchserve ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_TORCHSERVE }}:latest
+            docker run -d -p 8080:8080 --name test-torchserve "$IMAGE"
             sleep 30
             curl -f http://localhost:8080/ping || exit 1
           fi
@@ -167,10 +214,20 @@ jobs:
           echo "{\"commit\": \"${{ github.sha }}\", \"date\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" > models/model_artifacts/ci_metadata.json
 
       - name: Push to HuggingFace
+        if: env.HF_MODEL_REPO != ''
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_MODEL_REPO: ${{ secrets.HF_MODEL_REPO }}
         run: |
-          python models/push_to_registry.py push --repo-id ${{ secrets.HF_MODEL_REPO }}
+          python models/push_to_registry.py push --repo-id "$HF_MODEL_REPO"
+
+      - name: Warn if no registry configured
+        if: env.HF_MODEL_REPO == ''
+        env:
+          HF_MODEL_REPO: ${{ secrets.HF_MODEL_REPO }}
+        run: |
+          echo "⚠️  HF_MODEL_REPO not set - skipping registry update"
+          echo "Set the secret to enable automatic model updates"
 
   notify:
     needs: [validate-model, build-and-test, integration-test]
