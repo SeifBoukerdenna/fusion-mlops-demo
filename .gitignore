@@ -7,16 +7,18 @@ __pycache__/
 *.egg-info/
 dist/
 build/
-
 venv/
+env/
 
-# Model artifacts (large files)
+# Model artifacts - USE MODEL REGISTRY, NOT GIT
 *.pth
 *.onnx
 *.mar
 *.pt
 *.h5
 *.pkl
+models/model_artifacts/*.pth
+models/model_artifacts/*.onnx
 
 # Data
 data/
@@ -50,9 +52,13 @@ wandb/
 Thumbs.db
 *.log
 
-# Keep metadata and configs (small JSON files are fine)
+# Keep metadata and configs (small JSON files)
 !*_metadata.json
 !training_history.json
 
 # Docker
 *.tar
+
+# MLflow
+mlruns/
+mlartifacts/
