@@ -1,10 +1,11 @@
 .PHONY: help install train export validate package-torchserve \
         build-fastapi build-torchserve build docker-up docker-down \
-        k8s-deploy k8s-delete k8s-status test clean docker-logs
+        k8s-deploy k8s-delete k8s-status test clean docker-logs \
+        registry-upload registry-download registry-ui
 
 help:
-	@echo "Fusion MLOps Demo - M1 Mac Compatible"
-	@echo "======================================"
+	@echo "Fusion MLOps Demo - Production Flow"
+	@echo "====================================="
 	@echo "Setup:"
 	@echo "  make install          Install Python dependencies"
 	@echo ""
@@ -12,22 +13,21 @@ help:
 	@echo "  make train            Train model"
 	@echo "  make export           Export to ONNX"
 	@echo "  make validate         Validate ONNX model"
-	@echo "  make package-torchserve  Package TorchServe .mar"
 	@echo ""
-	@echo "Docker (M1 Native):"
+	@echo "Model Registry (Production):"
+	@echo "  make registry-upload  Upload model to MLflow registry"
+	@echo "  make registry-download Download model from registry"
+	@echo "  make registry-ui      Start MLflow UI"
+	@echo ""
+	@echo "Docker:"
 	@echo "  make build            Build all Docker images"
-	@echo "  make build-fastapi    Build FastAPI image"
-	@echo "  make build-torchserve Build TorchServe image"
 	@echo "  make docker-up        Start with docker-compose"
 	@echo "  make docker-down      Stop docker-compose"
-	@echo "  make docker-logs      View logs"
-	@echo "  make docker-test      Test endpoints"
 	@echo ""
 	@echo "Kubernetes:"
 	@echo "  make k8s-deploy       Deploy to Kubernetes"
 	@echo "  make k8s-delete       Delete from Kubernetes"
 	@echo "  make k8s-status       Check deployment status"
-	@echo "  make k8s-forward      Port forward services"
 	@echo ""
 	@echo "Testing:"
 	@echo "  make test             Run unit tests"
@@ -50,6 +50,25 @@ export:
 validate:
 	python models/validate_onnx.py
 
+# Model Registry Operations (Production)
+registry-upload:
+	@echo "Uploading model to MLflow registry..."
+	python scripts/model_registry.py upload --stage staging
+	@echo ""
+	@echo "To promote to production:"
+	@echo "  python scripts/model_registry.py upload --stage production"
+
+registry-download:
+	@echo "Downloading model from registry..."
+	python scripts/model_registry.py download --stage production || \
+	python scripts/model_registry.py download --stage staging
+
+registry-ui:
+	@echo "Starting MLflow UI..."
+	@echo "Open: http://localhost:5000"
+	mlflow ui
+
+# TorchServe
 package-torchserve:
 	cd torchserve && ./package_model.sh
 
@@ -57,12 +76,17 @@ package-torchserve:
 build: build-fastapi build-torchserve
 
 build-fastapi:
+	@echo "Downloading model for Docker build..."
+	@$(MAKE) registry-download || (echo "⚠️  No model in registry, training..." && $(MAKE) train export)
 	docker build -t fastapi-defect-classifier:latest -f Dockerfile.fastapi .
 
 build-torchserve:
+	@echo "Downloading model for Docker build..."
+	@$(MAKE) registry-download || (echo "⚠️  No model in registry, training..." && $(MAKE) train export)
 	docker build -t torchserve-defect-classifier:latest -f Dockerfile.torchserve .
 
 docker-up:
+	@$(MAKE) registry-download || (echo "⚠️  No model in registry, training..." && $(MAKE) train export)
 	docker compose up -d
 
 docker-down:
@@ -92,8 +116,8 @@ k8s-status:
 
 k8s-forward:
 	@echo "Starting port forwards..."
-	@echo "FastAPI will be at http://localhost:8000"
-	@echo "TorchServe will be at http://localhost:8080"
+	@echo "FastAPI: http://localhost:8000"
+	@echo "TorchServe: http://localhost:8080"
 	kubectl port-forward service/fastapi-service 8000:8000 & \
 	kubectl port-forward service/torchserve-service 8080:8080 &
 
@@ -110,3 +134,4 @@ clean:
 	find . -type f -name "*.pyc" -delete
 	find . -type f -name "*.pyo" -delete
 	docker compose down -v 2>/dev/null || true
+	rm -rf mlruns/ mlartifacts/ 2>/dev/null || true

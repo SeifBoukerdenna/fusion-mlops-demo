@@ -1,0 +1,24 @@
+artifact_path: file:///Users/malikmacbook/fusion-mlops-demo/mlruns/0/models/m-c5137ac2f17e460c85b677b3ecc20223/artifacts
+flavors:
+  onnx:
+    code: null
+    data: model.onnx
+    onnx_session_options: null
+    onnx_version: 1.15.0
+    providers:
+    - CUDAExecutionProvider
+    - CPUExecutionProvider
+  python_function:
+    data: model.onnx
+    env:
+      conda: conda.yaml
+      virtualenv: python_env.yaml
+    loader_module: mlflow.onnx
+    python_version: 3.11.3
+mlflow_version: 3.6.0
+model_id: m-c5137ac2f17e460c85b677b3ecc20223
+model_size_bytes: 44711415
+model_uuid: m-c5137ac2f17e460c85b677b3ecc20223
+prompts: null
+run_id: 09025e323c944c49bdb0a87d84c7757f
+utc_time_created: '2025-11-23 02:59:35.171774'

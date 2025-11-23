@@ -1,0 +1,10 @@
+artifact_location: file:///Users/malikmacbook/fusion-mlops-demo/mlruns/0/models/m-94ec353fd7f54422a52ab32c49970f49/artifacts
+creation_timestamp: 1763866669979
+experiment_id: '0'
+last_updated_timestamp: 1763866670019
+model_id: m-94ec353fd7f54422a52ab32c49970f49
+model_type: null
+name: model
+source_run_id: cd31b28ab7804ab39b7374cba3f38676
+status: 3
+status_message: null

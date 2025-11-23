@@ -1,0 +1,14 @@
+artifact_uri: file:///Users/malikmacbook/fusion-mlops-demo/mlruns/0/cd31b28ab7804ab39b7374cba3f38676/artifacts
+end_time: 1763866670021
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: cd31b28ab7804ab39b7374cba3f38676
+run_name: upload-resnet18-neu-v1.0
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1763866669951
+status: 4
+tags: []
+user_id: malikmacbook

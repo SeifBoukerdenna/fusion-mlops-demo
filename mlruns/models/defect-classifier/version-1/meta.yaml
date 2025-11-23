@@ -1,0 +1,15 @@
+creation_timestamp: 1763866780387
+current_stage: Staging
+deployment_job_state: null
+description: null
+last_updated_timestamp: 1763866780435
+model_id: m-c5137ac2f17e460c85b677b3ecc20223
+name: defect-classifier
+run_id: 09025e323c944c49bdb0a87d84c7757f
+run_link: null
+source: models:/m-c5137ac2f17e460c85b677b3ecc20223
+status: READY
+status_message: null
+storage_location: file:///Users/malikmacbook/fusion-mlops-demo/mlruns/0/models/m-c5137ac2f17e460c85b677b3ecc20223/artifacts
+user_id: null
+version: 1
