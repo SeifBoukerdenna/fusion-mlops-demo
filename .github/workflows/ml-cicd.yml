@@ -39,7 +39,7 @@ jobs:
           python models/validate_onnx.py
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: validated-models
           path: models/model_artifacts/*.onnx
@@ -59,7 +59,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Download validated models
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: validated-models
           path: models/model_artifacts/
@@ -157,7 +157,7 @@ jobs:
         run: pip install huggingface-hub
 
       - name: Download models
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: validated-models
           path: models/model_artifacts/
@@ -171,32 +171,6 @@ jobs:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
           python models/push_to_registry.py push --repo-id ${{ secrets.HF_MODEL_REPO }}
-
-  deploy-staging:
-    needs: update-registry
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-    environment: staging
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up kubectl
-        uses: azure/setup-kubectl@v3
-
-      - name: Configure kubectl
-        run: |
-          # Configure your K8s cluster here
-          # echo "${{ secrets.KUBE_CONFIG }}" > kubeconfig
-          # export KUBECONFIG=kubeconfig
-          echo "Skipping K8s deployment (configure with your cluster)"
-
-      - name: Deploy to staging
-        run: |
-          # kubectl apply -f k8s/
-          # kubectl rollout status deployment/fastapi-defect-classifier
-          # kubectl rollout status deployment/torchserve-defect-classifier
-          echo "K8s deployment step - configure with your cluster"
 
   notify:
     needs: [validate-model, build-and-test, integration-test]
