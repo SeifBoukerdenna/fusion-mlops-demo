@@ -1,9 +1,9 @@
 .PHONY: help install train export validate package-torchserve \
         build-fastapi build-torchserve build docker-up docker-down \
-        k8s-deploy k8s-delete k8s-status test clean
+        k8s-deploy k8s-delete k8s-status test clean docker-logs
 
 help:
-	@echo "Fusion MLOps Demo - Makefile Commands"
+	@echo "Fusion MLOps Demo - M1 Mac Compatible"
 	@echo "======================================"
 	@echo "Setup:"
 	@echo "  make install          Install Python dependencies"
@@ -14,21 +14,24 @@ help:
 	@echo "  make validate         Validate ONNX model"
 	@echo "  make package-torchserve  Package TorchServe .mar"
 	@echo ""
-	@echo "Docker:"
+	@echo "Docker (M1 Native):"
 	@echo "  make build            Build all Docker images"
 	@echo "  make build-fastapi    Build FastAPI image"
 	@echo "  make build-torchserve Build TorchServe image"
 	@echo "  make docker-up        Start with docker-compose"
 	@echo "  make docker-down      Stop docker-compose"
+	@echo "  make docker-logs      View logs"
+	@echo "  make docker-test      Test endpoints"
 	@echo ""
 	@echo "Kubernetes:"
 	@echo "  make k8s-deploy       Deploy to Kubernetes"
 	@echo "  make k8s-delete       Delete from Kubernetes"
 	@echo "  make k8s-status       Check deployment status"
+	@echo "  make k8s-forward      Port forward services"
 	@echo ""
 	@echo "Testing:"
 	@echo "  make test             Run unit tests"
-	@echo "  make benchmark        Run load tests"
+	@echo "  make ui               Start test UI"
 	@echo ""
 	@echo "Cleanup:"
 	@echo "  make clean            Remove artifacts"
@@ -68,6 +71,12 @@ docker-down:
 docker-logs:
 	docker compose logs -f
 
+docker-test:
+	@echo "Testing FastAPI..."
+	@curl -s http://localhost:8000/health | jq || echo "FastAPI not responding"
+	@echo "\nTesting TorchServe..."
+	@curl -s http://localhost:8080/ping | jq || echo "TorchServe not responding"
+
 # Kubernetes
 k8s-deploy:
 	kubectl apply -f k8s/fastapi-deployment.yaml
@@ -79,18 +88,25 @@ k8s-delete:
 	kubectl delete -f k8s/
 
 k8s-status:
-	kubectl get pods,svc
+	kubectl get pods,svc,deployments
+
+k8s-forward:
+	@echo "Starting port forwards..."
+	@echo "FastAPI will be at http://localhost:8000"
+	@echo "TorchServe will be at http://localhost:8080"
+	kubectl port-forward service/fastapi-service 8000:8000 & \
+	kubectl port-forward service/torchserve-service 8080:8080 &
 
 # Testing
 test:
 	pytest tests/ -v
 
-benchmark:
-	locust -f load_testing/locustfile.py --headless -u 10 -r 2 -t 30s
+ui:
+	python serve_ui.py
 
 # Cleanup
 clean:
-	find . -type d -name "__pycache__" -exec rm -rf {} +
+	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
 	find . -type f -name "*.pyc" -delete
 	find . -type f -name "*.pyo" -delete
-	docker-compose down -v
+	docker compose down -v 2>/dev/null || true

@@ -1,0 +1,64 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+venv/
+env/
+
+# Model artifacts (large files - copy explicitly)
+*.pth
+*.onnx
+*.mar
+*.pt
+*.h5
+*.pkl
+
+# Data
+data/
+datasets/
+*.jpg
+*.png
+*.jpeg
+*.csv
+*.zip
+*.tar.gz
+
+# Training outputs
+logs/
+runs/
+checkpoints/
+wandb/
+
+# Jupyter
+.ipynb_checkpoints
+*.ipynb
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+*.log
+
+# Git
+.git/
+.gitignore
+
+# Docker
+docker-compose.yml
+Dockerfile*
+.dockerignore
+
+# Keep metadata and configs
+!*_metadata.json
+!training_history.json
