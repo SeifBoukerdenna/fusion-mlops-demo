@@ -22,7 +22,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install --upgrade pip
-          pip install onnxruntime numpy mlflow boto3
+          pip install -r requirements.txt
 
       - name: Download model from registry
         env:
@@ -38,9 +38,8 @@ jobs:
           fi
 
       - name: Validate ONNX model
-        run: |
-          python models/validate_onnx.py
-
+        run: python models/validate_onnx.py
+        
       - name: Upload validation results
         if: always()
         uses: actions/upload-artifact@v4
@@ -64,8 +63,7 @@ jobs:
           cache: 'pip'
 
       - name: Install dependencies
-        run: |
-          pip install -r requirements.txt
+        run: pip install -r requirements.txt
 
       - name: Run pytest
         run: |
@@ -99,8 +97,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Test image exists
-        run: |
-          docker images | grep ${{ matrix.service }}-defect-classifier
+        run: docker images | grep ${{ matrix.service }}-defect-classifier
 
   lint:
     runs-on: ubuntu-latest
@@ -114,16 +111,13 @@ jobs:
           python-version: '3.11'
 
       - name: Install linting tools
-        run: |
-          pip install ruff black isort
+        run: pip install ruff black isort
 
       - name: Run ruff
-        run: |
-          ruff check . --ignore E501,F401 || true
+        run: ruff check . --ignore E501,F401 || true
 
       - name: Check code formatting
-        run: |
-          black --check . --exclude venv || true
+        run: black --check . --exclude venv || true
 
   security-scan:
     runs-on: ubuntu-latest
@@ -152,7 +146,7 @@ jobs:
           echo "- ✅ Tests: ${{ needs.test.result }}" >> $GITHUB_STEP_SUMMARY
           echo "- ✅ Docker Build: ${{ needs.docker-build-test.result }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-
+          
           if [ "${{ needs.validate-model.result }}" = "failure" ]; then
             echo "❌ **Model validation failed!**" >> $GITHUB_STEP_SUMMARY
             exit 1
