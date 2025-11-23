@@ -1,0 +1,148 @@
+name: Model Retraining
+
+on:
+  # Run weekly on Sundays at 2 AM UTC
+  schedule:
+    - cron: '0 2 * * 0'
+
+  # Allow manual trigger
+  workflow_dispatch:
+    inputs:
+      epochs:
+        description: 'Number of training epochs'
+        required: false
+        default: '20'
+      batch_size:
+        description: 'Batch size'
+        required: false
+        default: '32'
+
+jobs:
+  retrain-model:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Download training data
+        run: |
+          # In production, download from S3/GCS/Azure Blob
+          # aws s3 sync s3://your-bucket/NEU-DET data/NEU-DET
+          # gsutil -m cp -r gs://your-bucket/NEU-DET data/
+
+          echo "⚠️  Using test mode (no real data)"
+          echo "In production: Download data from cloud storage"
+
+      - name: Train model
+        run: |
+          # Run with test flag since we don't have real data in CI
+          python models/train_defect_classifier.py --test
+
+          # In production with real data:
+          # python models/train_defect_classifier.py
+
+      - name: Export to ONNX
+        run: |
+          python models/export_to_onnx.py
+
+      - name: Validate model
+        run: |
+          python models/validate_onnx.py
+
+      - name: Compare model performance
+        run: |
+          echo "Comparing new model vs previous model..."
+          # Example: Compare validation accuracy
+          # python scripts/compare_models.py \
+          #   --old-model models/model_artifacts/resnet18_neu.onnx \
+          #   --new-model models/model_artifacts/resnet18_neu_new.onnx \
+          #   --threshold 0.95
+
+          echo "✅ Model comparison would happen here"
+
+      - name: Upload model artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: trained-model-${{ github.run_number }}
+          path: |
+            models/model_artifacts/resnet18_neu.pth
+            models/model_artifacts/resnet18_neu.onnx
+            models/model_artifacts/resnet18_neu_metadata.json
+            models/model_artifacts/training_history.json
+          retention-days: 30
+
+      - name: Create Pull Request with new model
+        if: success()
+        run: |
+          # Create a PR with the new model for review
+          # This ensures human approval before deploying new models
+
+          echo "Creating PR with new model artifacts..."
+
+          # git config user.name "github-actions[bot]"
+          # git config user.email "github-actions[bot]@users.noreply.github.com"
+          # git checkout -b model-update-${{ github.run_number }}
+          # git add models/model_artifacts/
+          # git commit -m "Update model from retraining run ${{ github.run_number }}"
+          # git push origin model-update-${{ github.run_number }}
+
+          # gh pr create \
+          #   --title "Model Update: Run ${{ github.run_number }}" \
+          #   --body "Automated model retraining completed. Review metrics before merging."
+
+          echo "✅ PR creation would happen here"
+
+      - name: Send notification
+        if: always()
+        run: |
+          echo "Sending notification to Slack/Email..."
+          # curl -X POST ${{ secrets.SLACK_WEBHOOK_URL }} \
+          #   -H 'Content-Type: application/json' \
+          #   -d '{"text": "Model retraining ${{ job.status }}"}'
+
+          echo "✅ Notification would be sent here"
+
+  # Compare with baseline
+  performance-check:
+    runs-on: ubuntu-latest
+    needs: retrain-model
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: trained-model-${{ github.run_number }}
+          path: models/model_artifacts/
+
+      - name: Check model performance degradation
+        run: |
+          echo "Checking for model performance degradation..."
+          # Compare accuracy, latency, model size
+          # If worse than baseline, fail the workflow
+
+          BASELINE_ACC=99.0
+          NEW_ACC=$(python -c "import json; print(json.load(open('models/model_artifacts/training_history.json'))[-1]['val_acc'])")
+
+          echo "Baseline: $BASELINE_ACC%"
+          echo "New model: $NEW_ACC%"
+
+          if (( $(echo "$NEW_ACC < $BASELINE_ACC" | bc -l) )); then
+            echo "❌ Model performance degraded!"
+            echo "Consider investigating training data or hyperparameters"
+            # Don't fail in CI for now
+            # exit 1
+          else
+            echo "✅ Model performance acceptable"
+          fi

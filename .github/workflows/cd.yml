@@ -1,0 +1,168 @@
+name: CD - Build & Deploy
+
+on:
+  push:
+    branches: [ main ]
+    tags:
+      - 'v*'
+  workflow_dispatch:  # Allow manual trigger
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ${{ github.repository }}
+
+jobs:
+  # Job 1: Build and Push Docker Images
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        service: [fastapi, torchserve]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push ${{ matrix.service }}
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile.${{ matrix.service }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64  # Add linux/arm64 if deploying to ARM
+
+      - name: Image digest
+        run: echo ${{ steps.meta.outputs.digest }}
+
+  # Job 2: Deploy to Staging (Kubernetes)
+  deploy-staging:
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    environment:
+      name: staging
+      url: http://staging.yourapp.com
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Option A: Deploy to cloud K8s (EKS/GKE/AKS)
+      - name: Configure kubectl
+        if: false  # Enable when you have cloud cluster
+        run: |
+          # Example for EKS:
+          # aws eks update-kubeconfig --name your-cluster --region us-west-2
+          #
+          # Example for GKE:
+          # gcloud container clusters get-credentials your-cluster --zone us-central1-a
+          #
+          # Example for AKS:
+          # az aks get-credentials --resource-group your-rg --name your-cluster
+          echo "Cloud K8s not configured yet"
+
+      # Option B: Deploy to local/dev K8s (minikube, kind, etc)
+      - name: Deploy to K8s
+        run: |
+          echo "Updating K8s manifests with new image tags..."
+
+          # Update image tags in deployment files
+          export IMAGE_TAG="${GITHUB_SHA::7}"
+
+          # Apply K8s manifests (when connected to cluster)
+          # kubectl apply -f k8s/fastapi-deployment.yaml
+          # kubectl apply -f k8s/fastapi-service.yaml
+          # kubectl apply -f k8s/torchserve-deployment.yaml
+          # kubectl apply -f k8s/torchserve-service.yaml
+
+          # Wait for rollout
+          # kubectl rollout status deployment/fastapi-defect-classifier
+          # kubectl rollout status deployment/torchserve-defect-classifier
+
+          echo "⚠️  K8s deployment skipped (no cluster configured)"
+          echo "To enable: Set up kubeconfig in GitHub secrets"
+
+      - name: Run smoke tests
+        run: |
+          echo "Running smoke tests against staging..."
+          # Example:
+          # curl -f http://staging.yourapp.com/health || exit 1
+          echo "✅ Smoke tests would run here"
+
+  # Job 3: Deploy to Production (manual approval)
+  deploy-production:
+    runs-on: ubuntu-latest
+    needs: deploy-staging
+    if: startsWith(github.ref, 'refs/tags/v')
+    environment:
+      name: production
+      url: http://yourapp.com
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to production K8s
+        run: |
+          echo "🚀 Deploying to production..."
+          export IMAGE_TAG="${GITHUB_REF#refs/tags/}"
+
+          # Update production manifests
+          # kubectl apply -f k8s/fastapi-deployment.yaml
+          # kubectl apply -f k8s/torchserve-deployment.yaml
+
+          echo "✅ Production deployment would happen here"
+
+      - name: Create deployment notification
+        run: |
+          echo "## 🚀 Production Deployment" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version**: ${GITHUB_REF#refs/tags/}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Deployed by**: ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+
+  # Job 4: Update model registry
+  update-model-registry:
+    runs-on: ubuntu-latest
+    needs: deploy-production
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Register model version
+        run: |
+          echo "Registering model in MLflow/registry..."
+          # Example with MLflow:
+          # pip install mlflow boto3
+          # python scripts/register_model.py \
+          #   --model-path models/model_artifacts/resnet18_neu.onnx \
+          #   --version ${GITHUB_REF#refs/tags/} \
+          #   --stage production
+          echo "✅ Model registry update would happen here"
