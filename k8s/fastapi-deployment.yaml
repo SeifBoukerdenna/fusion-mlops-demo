@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: fastapi
-        image: fastapi-defect-classifier:latest
+        image: fusion-mlops-demo-fastapi:latest
         imagePullPolicy: Never
         ports:
         - containerPort: 8000

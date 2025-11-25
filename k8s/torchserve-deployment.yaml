@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: torchserve
-        image: torchserve-defect-classifier:latest
+        image: fusion-mlops-demo-torchserve:latest
         imagePullPolicy: Never
         ports:
         - containerPort: 8080

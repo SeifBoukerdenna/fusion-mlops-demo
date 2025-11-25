@@ -28,3 +28,16 @@ services:
       timeout: 10s
       retries: 3
     restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    ports:
+      - "3000:3000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/test_ui.html"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped

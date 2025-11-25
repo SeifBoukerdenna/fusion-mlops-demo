@@ -2,6 +2,7 @@ from fastapi import FastAPI, HTTPException, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import time
+import logging
 from pathlib import Path
 import sys
 from PIL import Image
@@ -11,6 +12,13 @@ sys.path.append(str(Path(__file__).parent))
 
 from schemas import PredictionRequest, PredictionResponse, HealthResponse
 from onnx_infer import ONNXDefectClassifier
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 model = None
 
@@ -22,9 +30,9 @@ async def lifespan(app: FastAPI):
 
     if model_path.exists():
         model = ONNXDefectClassifier(str(model_path), str(metadata_path))
-        print("✓ FastAPI server ready")
+        logger.info("✓ FastAPI server ready")
     else:
-        print(f"⚠️  Model not found at {model_path}")
+        logger.warning(f"⚠️  Model not found at {model_path}")
     yield
 
 app = FastAPI(
@@ -59,13 +67,15 @@ async def predict_multipart(file: UploadFile = File(...)):
     if not model:
         raise HTTPException(503, "Model not loaded")
 
+    logger.info(f"Prediction request received: filename={file.filename}")
+
     try:
         start = time.time()
         image_bytes = await file.read()
         image = Image.open(io.BytesIO(image_bytes)).convert('RGB')
         pred_id, conf, probs = model.predict(image)
 
-        return PredictionResponse(
+        result = PredictionResponse(
             predicted_class=model.class_names[pred_id],
             predicted_class_id=pred_id,
             confidence=conf,
@@ -73,7 +83,12 @@ async def predict_multipart(file: UploadFile = File(...)):
             model_version=model.model_version,
             inference_time_ms=round((time.time() - start) * 1000, 2)
         )
+
+        logger.info(f"Prediction complete: class={result.predicted_class}, confidence={conf:.2%}, time={result.inference_time_ms}ms")
+
+        return result
     except Exception as e:
+        logger.error(f"Inference failed: {e}", exc_info=True)
         raise HTTPException(400, f"Inference failed: {e}")
 
 @app.get("/v1/classes")

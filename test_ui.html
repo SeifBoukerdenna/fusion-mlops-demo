@@ -28,27 +28,6 @@
             color: #333;
         }
 
-        .env-selector {
-            margin-bottom: 20px;
-            text-align: center;
-        }
-
-        .env-selector button {
-            margin: 0 10px;
-            padding: 8px 20px;
-            border: 2px solid #007bff;
-            background: white;
-            color: #007bff;
-            border-radius: 5px;
-            cursor: pointer;
-            font-weight: 500;
-        }
-
-        .env-selector button.active {
-            background: #007bff;
-            color: white;
-        }
-
         .upload-zone {
             border: 3px dashed #ccc;
             border-radius: 10px;
@@ -205,11 +184,6 @@
     <div class="container">
         <h1>🔍 Defect Classification Test</h1>
 
-        <div class="env-selector">
-            <button id="btnLocal" onclick="setEnvironment('local')">Local</button>
-            <button id="btnProduction" onclick="setEnvironment('production')">Production</button>
-        </div>
-
         <div class="upload-zone" id="uploadZone">
             <p style="font-size: 18px; color: #666; margin-bottom: 10px;">
                 📁 Drag & drop image here or click to upload
@@ -229,32 +203,8 @@
     </div>
 
     <script>
-        const ENVIRONMENTS = {
-            local: {
-                fastapi: 'http://localhost:8000',
-                torchserve: 'http://localhost:8080'
-            },
-            production: {
-                fastapi: 'https://fusion-mlops-fastapi.fly.dev',
-                torchserve: 'https://fusion-mlops-torchserve.fly.dev'
-            }
-        };
-
-        let currentEnv = 'local';
-
-        // Auto-detect environment
-        if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-            currentEnv = 'production';
-        }
-
-        function setEnvironment(env) {
-            currentEnv = env;
-            document.getElementById('btnLocal').classList.toggle('active', env === 'local');
-            document.getElementById('btnProduction').classList.toggle('active', env === 'production');
-        }
-
-        // Initialize
-        setEnvironment(currentEnv);
+        const FASTAPI_URL = 'http://localhost:8000';
+        const TORCHSERVE_URL = 'http://localhost:8080';
 
         const uploadZone = document.getElementById('uploadZone');
         const fileInput = document.getElementById('fileInput');
@@ -324,17 +274,16 @@
 
             try {
                 const formData = new FormData();
-                const baseUrl = ENVIRONMENTS[currentEnv][type];
 
                 if (type === 'fastapi') {
                     formData.append('file', selectedFile);
-                    var response = await fetch(`${baseUrl}/v1/predict/multipart`, {
+                    var response = await fetch(`${FASTAPI_URL}/v1/predict/multipart`, {
                         method: 'POST',
                         body: formData
                     });
                 } else {
                     formData.append('data', selectedFile);
-                    var response = await fetch(`${baseUrl}/predictions/defect_classifier`, {
+                    var response = await fetch(`${TORCHSERVE_URL}/predictions/defect_classifier`, {
                         method: 'POST',
                         body: formData
                     });
@@ -354,8 +303,7 @@
                     <h3>${title}</h3>
                     <div class="error">❌ ${error.message}</div>
                     <p style="margin-top: 10px; font-size: 13px; color: #666;">
-                        Environment: ${currentEnv}<br>
-                        Make sure server is running at ${ENVIRONMENTS[currentEnv][type]}
+                        Make sure ${type === 'fastapi' ? 'FastAPI' : 'TorchServe'} is running at ${type === 'fastapi' ? FASTAPI_URL : TORCHSERVE_URL}
                     </p>
                 `;
             }
